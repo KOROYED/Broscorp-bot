@@ -45,7 +45,7 @@ There are no commands: **any text message is a question, any file is advice.**
 
 ```
 question ─► scope filter ─► router LLM (by titles) ┐
-            (code)          BM25 search (by text)  ┴─► answer LLM ─► code appends citations
+            (code)          BM25 search (by text)  ┴─► pick 1 doc ─► answer from it ─► 1 citation
 ```
 
 1. **Scope filter** (`bot/retrieval.py`, `bot/places.py`). A document belongs to the whole forest,
@@ -55,9 +55,14 @@ question ─► scope filter ─► router LLM (by titles) ┐
 2. **Hybrid retrieval.** A small model (`gpt-oss-20b`) picks documents by *meaning* from their titles
    («поїсти» → «Чим поживитись»); BM25 finds *words inside* the text («тиша» is a section of
    «Правила співжиття»). Groq has no embeddings model, and the corpus is small, so no vector DB.
-3. **Answer** (`gpt-oss-120b`). The model returns JSON `{answer, used}`; the **code** appends citations
-   for the `used` documents, so the citation format is always exactly the agreed one. Place-specific
-   advice is shown first and outranks general advice (client's rule).
+3. **Pick, then answer** (`gpt-oss-120b`). One answer comes from **one document**, never a mix:
+   - *Pick*: the model sees the candidates and returns only `{status, source, question}`: the number
+     of the one most relevant document (place-specific outranks general, the client's rule) and the
+     question made standalone from earlier *questions* (never earlier answers). It writes no answer.
+   - *Answer*: a second call sees **only that document** and the question, so there is nothing to mix
+     in. Direct facts or what logically follows («6 жолудів більше за потрібні 5»), or `found: false`.
+   - The **code** appends that single citation. Not found, «покажи всі поради», comparisons and
+     questions that need an unnamed place get fixed replies written by code, with no citation.
 4. **Uploads** (`bot/parsing.py`, `bot/llm.py`). Text is extracted (pypdf, python-docx, Tesseract OCR
    for scans). The router model returns a title and scope; `unclear` → the bot asks the sender.
 5. **Versioning** (`bot/documents.py`). Same normalized title + same scope = newer version: the old one

@@ -57,9 +57,9 @@ class Scope:
 
     @property
     def label(self) -> str:
-        """Human-readable Ukrainian label, e.g. for buttons."""
+        """Human-readable Ukrainian label for animals, e.g. for buttons: «Під дубом»."""
         if self.kind is ScopeKind.PLACE:
-            return f"рукавичка «{self.value}»"
+            return self.value
         if self.kind is ScopeKind.AREA:
             return AREA_NAMES[Area(self.value)]
         return "увесь ліс"

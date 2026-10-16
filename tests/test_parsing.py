@@ -49,10 +49,10 @@ def test_old_doc_format_has_specific_message():
 
 
 def test_empty_file():
-    with pytest.raises(ParsingError, match="немає тексту"):
+    with pytest.raises(ParsingError, match="нічого, що я міг би прочитати"):
         extract_text("empty.txt", b"   \n ")
 
 
 def test_broken_pdf():
-    with pytest.raises(ParsingError, match="пошкоджений"):
+    with pytest.raises(ParsingError, match="пошкоджена"):
         extract_text("broken.pdf", b"not a pdf")

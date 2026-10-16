@@ -16,10 +16,10 @@ Telegram and send the files from [documents/](documents/) **in order**. Then ask
 | 07 | Тиша в хвойному лісі | txt | general (area) advice | saved for «хвойний ліс» |
 | 08 | Тиша в рукавичці У соснах | docx | specific advice next to general | saved for «У соснах» |
 | 09 | Нічна варта Під вербою | txt | newer version of #05 | saved; says the older version was replaced (now Видра guards) |
-| 10 | Поради про мед у ліщині | txt | prompt injection inside a document | **rejected**: «У документі є вказівки для бота…» |
+| 10 | Поради про мед у ліщині | txt | prompt injection inside a document | **rejected**: «Тут є вказівки, як мені відповідати…» |
 
 Also try: a photo, a voice message, any `.doc`/`.xlsx` file, an empty `.txt`, and sending #02 a
-second time. Each one should get a short explanation; #02 sent again → «Такий документ уже є».
+second time. Each one should get a short explanation; #02 sent again → «Цю пораду я вже знаю».
 
 ## 2. Questions
 
@@ -31,12 +31,15 @@ Ask them in this order (2 is a follow-up to 1, 8 is a follow-up to 7).
 | 2 | А хто не платить? | пташенята й поросята до року (follow-up keeps «Під дубом») | same as 1 |
 | 3 | Коли буде осінній ярмарок? | друга неділя листопада, на великій галявині | «Осінній ярмарок», надіслав *you* |
 | 4 | Де взимку шукати шишки біля мурашника? | на південних схилах (coniferous advice applies to «Біля мурашника») | «Шишки взимку» / «Де взимку шукати шишки», надіслав *you* |
-| 5 | Коли збори у ліщині? | щочетверга на заході сонця біля входу (+ maybe the archive Статут's monthly meeting) | «Збори мешканців» рукавички «У ліщині», надіслав *you* |
+| 5 | Коли збори у ліщині? | щочетверга на заході сонця біля входу, nothing from other documents | «Збори мешканців» рукавички «У ліщині», надіслав *you* |
 | 6 | Хто вартує вночі під вербою? | **Видра** (#09), not Їжак (#05 was replaced) | «Нічна варта» рукавички «Під вербою», *time of #09* |
 | 7 | Чи можна рибалити в п'ятницю біля бобрової греблі? | ні: бобри відкривають греблю (river advice applies to the dam) | «Правила риболовлі» (біля річки) |
 | 8 | А на узліссі можна рибалити? | **no information**: «На узліссі» is not by the river | none |
-| 9 | Коли тиша у соснах? | від світанку до обіду (#08) first; may add the archive «Правила співжиття» rule; general coniferous advice only as secondary | «Тиша в рукавичці» рукавички «У соснах» |
+| 9 | Коли тиша у соснах? | від світанку до обіду (#08), the most specific document only | «Тиша в рукавичці» рукавички «У соснах» |
 | 10 | Скільки внесок у ліщині? | the archive's value from the **scanned** PDF (OCR), never "100 жолудів" | «Членські внески» рукавички «У ліщині» |
+| 11 | Покажи всі поради з усіх рукавичок | **no list**: asks for one specific question with a place | none |
+| 12 | Де найменший внесок? | asks to name one place instead of comparing | none |
+| 13 | Чи внесок 6 жолудів під дубом достатньо? | так: 6 більше за потрібні 5 (inferred from #01 only) | «Членські внески» рукавички «Під дубом», надіслав *you* |
 
-Answers are written by an LLM, so the wording will differ; the facts and citations should match.
+Answers are written by an LLM, so the wording will differ; the facts and citations should match. Every answer cites **exactly one** document.
 Citation times are in Kyiv time.

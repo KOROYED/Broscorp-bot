@@ -15,6 +15,8 @@ they still need her confirmation.
 - **Confirmed.** Formats: PDF, Word, plain text. No photos of documents, no voice messages.
 - **Confirmed.** On an animal's first upload the bot asks «Як тебе звати?» and remembers the real
   name. The date and time of sending are stored.
+- **Confirmed.** A рукавичка is a physical place in the forest where animals live and have their
+  ОСМД. The word may be used in answers, e.g. «порада для рукавички «Під дубом»».
 - **Confirmed.** A fixed list of 8 places (рукавички); new ones never appear:
 
   | Place | Area |
@@ -58,10 +60,17 @@ they still need her confirmation.
   archive documents have no author or time.
 - **Decision.** Conversation memory: the last 3 questions/answers per chat, so follow-ups work
   («а до якого числа?» keeps the place).
-- **Decision.** If a question names no place and the answer differs by place, the bot lists the answer
-  for each place or asks which one.
-- **Decision.** Comparison questions («де найменший внесок?») compare all places that have documents.
-- **Decision.** If the LLM is unavailable: «Зараз не можу відповісти… спробуй за хвилину». The error
+- **Decision.** One answer comes from **one document**: the most relevant one, preferring the most
+  specific scope, and it is the only one cited. The answer contains only what that document says
+  directly or what logically follows from it («6 жолудів більше за потрібні 5, тож достатньо»).
+  Documents are never mixed. If no document answers, the bot says so.
+- **Decision.** Questions that ask for everything («покажи всі поради»), span or compare several
+  places («де найменший внесок?»), or depend on a place that isn't named get a short request to ask
+  one specific question and name the place.
+- **Decision.** The bot speaks as a forest character, **Лісовий Порадник**, who keeps the animals'
+  advice. Its messages never mention documents, files or being a bot. «Рукавичка» is used freely
+  (see above). The citation line keeps the confirmed format.
+- **Decision.** If the LLM is unavailable: «Ох, щось я задумався й загубив думку… Спитай мене ще раз за хвилинку». The error
   is logged.
 
 ## Open questions

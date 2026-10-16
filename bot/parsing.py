@@ -31,10 +31,10 @@ def check_extension(filename: str) -> str:
     ext = PurePath(filename).suffix.lower()
     if ext == ".doc":
         raise ParsingError(
-            "Старий формат .doc я не читаю. Збережи файл як .docx або PDF і надішли ще раз."
+            "Старий формат .doc я не читаю. Збережи пораду як .docx або PDF і принеси ще раз."
         )
     if ext not in SUPPORTED_EXTENSIONS:
-        raise ParsingError("Я приймаю лише PDF, Word (.docx) або текстові файли (.txt).")
+        raise ParsingError("Я читаю лише поради в PDF, Word (.docx) або простому тексті (.txt).")
     return ext
 
 
@@ -57,14 +57,14 @@ def extract_text(filename: str, data: bytes) -> str:
     except pytesseract.TesseractNotFoundError as e:
         # Our problem, not the user's file: Tesseract must be installed (it is in Docker).
         logger.error("Tesseract is not installed, can't OCR %s", filename)
-        raise ParsingError("Зараз я не можу розпізнати скан. Спробуй надіслати файл з текстом.") from e
+        raise ParsingError("Зараз я не можу розібрати знімок сторінки. Принеси пораду, записану текстом.") from e
     except Exception as e:
         logger.exception("Failed to parse %s", filename)
-        raise ParsingError("Не вдалося відкрити файл: можливо, він пошкоджений.") from e
+        raise ParsingError("Не можу розгорнути цю пораду: мабуть, вона пошкоджена.") from e
 
     text = _clean(text)
     if not text:
-        raise ParsingError("У файлі немає тексту, який я можу прочитати.")
+        raise ParsingError("Тут не написано нічого, що я міг би прочитати.")
     return text
 
 
@@ -104,7 +104,7 @@ def _txt_text(data: bytes) -> str:
             return data.decode(encoding)
         except UnicodeDecodeError:
             continue
-    raise ParsingError("Не вдалося прочитати текстовий файл: збережи його в кодуванні UTF-8.")
+    raise ParsingError("Не можу прочитати ці літери: збережи пораду в кодуванні UTF-8.")
 
 
 def _clean(text: str) -> str:

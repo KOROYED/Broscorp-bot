@@ -45,15 +45,18 @@ MAX_FILE_SIZE = 20 * 1024 * 1024
 MAX_NAME_LENGTH = 50
 TELEGRAM_MESSAGE_LIMIT = 4096
 
+# Every message speaks as Лісовий Порадник, a forest character: no "bot", "document" or
+# "file" talk. «Рукавичка» is fine: the client confirmed it's a real place in the forest.
+# The citation under answers keeps the client's confirmed format.
 GREETING = """\
-Привіт! Я зберігаю поради звірів нашого лісу 🌲
+Привіт! Я — Лісовий Порадник 🌲 Бережу поради звірів нашого лісу.
 
-Питай мене про життя в лісі, і я відповім. \
-Наприклад: «Скільки внесок під дубом?»
+Питай мене про лісове життя, наприклад: «Скільки внесок під дубом?»
 
-Маєш корисну пораду? Надішли її файлом: PDF, Word або текстовим."""
+Знаєш щось корисне? Принеси мені свою пораду в PDF, Word або простому тексті, \
+і я збережу її для всіх."""
 
-LLM_UNAVAILABLE = "Зараз не можу відповісти: щось із моїм розумом 🧠. Спробуй, будь ласка, за хвилину."
+LLM_UNAVAILABLE = "Ох, щось я задумався й загубив думку 🍂 Спитай мене ще раз за хвилинку."
 
 
 class Upload(StatesGroup):
@@ -84,14 +87,14 @@ async def on_document(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     document = message.document
-    filename = document.file_name or "документ"
+    filename = document.file_name or "порада"
     try:
         check_extension(filename)
     except ParsingError as e:
         await message.answer(str(e))
         return
     if document.file_size and document.file_size > MAX_FILE_SIZE:
-        await message.answer("Файл завеликий: я можу прийняти документ до 20 МБ.")
+        await message.answer("Ця порада заважка для мене: я можу взяти не більше ніж 20 МБ.")
         return
 
     pending = {
@@ -105,7 +108,7 @@ async def on_document(
     if user is None:
         await state.set_state(Upload.waiting_name)
         await state.update_data(pending=pending)
-        await message.answer("Дякую за документ! Це твій перший документ, тож скажи: як тебе звати?")
+        await message.answer("Дякую за пораду! Бачу тебе вперше. Як тебе звати?")
         return
     await _process_upload(message, bot, state, session_factory, pending)
 
@@ -127,7 +130,7 @@ async def on_name(
 
 @router.message(Upload.waiting_name)
 async def on_name_other(message: Message) -> None:
-    await message.answer("Напиши, будь ласка, своє ім’я текстом.")
+    await message.answer("Скажи своє ім’я словами, будь ласка.")
 
 
 @router.callback_query(Upload.waiting_scope, ScopeChoice.filter())
@@ -141,16 +144,16 @@ async def on_scope(
     await state.clear()
     await callback.answer()
     if not upload:
-        await callback.message.edit_text("Цей документ уже оброблено.")
+        await callback.message.edit_text("Цю пораду я вже прибрав на місце.")
         return
     scope = ALL_SCOPES[callback_data.index]
-    await callback.message.edit_text(f"Дякую! Місце: {scope.label}.")
+    await callback.message.edit_text(f"Дякую! Запам’ятав: {scope.label}.")
     await _save_upload(callback.message, callback.from_user.id, session_factory, upload, scope)
 
 
 @router.callback_query(ScopeChoice.filter())
 async def on_stale_scope(callback: CallbackQuery) -> None:
-    await callback.answer("Цей вибір уже неактуальний.")
+    await callback.answer("Це питання вже минуло.")
 
 
 async def _process_upload(
@@ -161,7 +164,7 @@ async def _process_upload(
     pending: dict,
 ) -> None:
     filename = pending["filename"]
-    await message.answer(f"Читаю «{filename}»…")
+    await message.answer(f"Гортаю «{filename}»…")
     file = await bot.download(pending["file_id"])
     data = file.read()
     digest = file_hash(data)
@@ -169,7 +172,7 @@ async def _process_upload(
     async with session_factory() as session:
         duplicate = await find_active_by_hash(session, digest)
     if duplicate is not None:
-        await message.answer(f"Такий документ уже є: «{duplicate.title}» ({duplicate.scope.label}).")
+        await message.answer(f"Цю пораду я вже знаю: «{duplicate.title}» ({duplicate.scope.label}).")
         return
 
     try:
@@ -183,15 +186,15 @@ async def _process_upload(
         classification = await classify_document(filename, text)
     except LLMError:
         logger.exception("Classification failed for %s", filename)
-        await message.answer("Не вдалося обробити документ. Спробуй надіслати його ще раз за хвилину.")
+        await message.answer("Щось я не зміг розібрати цю пораду. Принеси її ще раз за хвилинку.")
         return
 
     if classification.has_instructions:
         # Defence in depth against prompt injection: such text would try to steer answers.
         logger.warning("Rejected upload %s: contains instructions to the bot", filename)
         await message.answer(
-            "У документі є вказівки для бота, а не поради звірам, тож я його не збережу. "
-            "Прибери їх і надішли документ ще раз."
+            "Тут є вказівки, як мені відповідати, а не поради звірам, тож я цього не збережу. "
+            "Прибери їх і принеси пораду ще раз."
         )
         return
 
@@ -206,8 +209,9 @@ async def _process_upload(
         await state.set_state(Upload.waiting_scope)
         await state.update_data(upload=upload)
         await message.answer(
-            f"Документ «{classification.title}». З тексту не зрозуміло, для якого місця ця порада. "
-            "Обери, будь ласка:",
+            f"Порада «{classification.title}». "
+            "Не можу зрозуміти, для якої рукавички чи частини лісу вона. "
+            "Підкажи, будь ласка:",
             reply_markup=_scope_keyboard(),
         )
         return
@@ -232,9 +236,9 @@ async def _save_upload(
             author_id=author_id,
             sent_at=datetime.fromisoformat(upload["sent_at"]),
         )
-    reply = f"Зберіг документ «{result.document.title}» для: {scope.label}. Дякую!"
+    reply = f"Зберіг пораду «{result.document.title}» ({scope.label}). Дякую!"
     if result.replaced is not None:
-        reply += "\nЦе новіша версія — попередню замінено, тепер звірі бачитимуть лише нову."
+        reply += "\nЦе свіжіша порада: стару я прибрав, тепер звірі чутимуть лише нову."
     await message.answer(reply)
 
 
@@ -243,7 +247,7 @@ async def _save_name(
 ) -> bool:
     name = " ".join(raw_name.split())
     if not name or len(name) > MAX_NAME_LENGTH:
-        await message.answer(f"Ім’я має бути від 1 до {MAX_NAME_LENGTH} символів. Спробуй ще раз.")
+        await message.answer(f"Ім’я має бути від 1 до {MAX_NAME_LENGTH} літер. Спробуй ще раз.")
         return False
     async with session_factory() as session:
         await set_user_name(session, message.from_user.id, name)
@@ -264,12 +268,12 @@ def _scope_keyboard() -> InlineKeyboardMarkup:
 
 @router.message(F.photo)
 async def on_photo(message: Message) -> None:
-    await message.answer("Фото документів я не читаю. Надішли, будь ласка, PDF, Word (.docx) або .txt.")
+    await message.answer("Малюнків я не розгляну. Принеси пораду в PDF, Word (.docx) або простому тексті (.txt).")
 
 
 @router.message(F.voice | F.audio | F.video_note)
 async def on_voice(message: Message) -> None:
-    await message.answer("Голосові повідомлення я не слухаю. Напиши питання текстом, будь ласка.")
+    await message.answer("Голосу я не чую. Напиши питання словами, будь ласка.")
 
 
 # --- questions ---
@@ -297,7 +301,7 @@ async def on_question(
 
 @router.message()
 async def on_other(message: Message) -> None:
-    await message.answer("Я розумію текстові питання й поради у файлах PDF, Word (.docx) або .txt.")
+    await message.answer("Я розумію питання, написані словами, і поради в PDF, Word (.docx) або .txt.")
 
 
 # --- formatting helpers ---

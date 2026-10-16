@@ -3,14 +3,14 @@
 import json
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 
 import groq
 from groq import AsyncGroq
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 from bot import prompts
 from bot.config import settings
-from bot.memory import Turn
 from bot.places import FOREST, PLACES, Area, Scope, area_scope, place_scope
 
 logger = logging.getLogger(__name__)
@@ -80,41 +80,93 @@ class ContextDocument:
     text: str
 
 
+def _document_block(d: ContextDocument) -> str:
+    return f"<документ номер={d.number}>\nНазва: «{d.title}»\nДля: {d.level}\n{d.text}\n</документ>"
+
+
+class PickStatus(StrEnum):
+    FOUND = "found"
+    NOT_FOUND = "not_found"
+    NEED_PLACE = "need_place"  # the answer depends on a place nobody named
+    TOO_BROAD = "too_broad"  # «покажи все», comparisons: no single document answers
+
+
 @dataclass
-class Answer:
-    text: str
-    used: list[int]  # ContextDocument.number values the answer is based on
+class Pick:
+    status: PickStatus
+    source: int | None  # ContextDocument.number, set only when status is FOUND
+    question: str  # standalone question: «а до якого числа?» with the place and topic filled in
+
+
+class _PickJSON(BaseModel):
+    status: PickStatus
+    source: int | None = None
+    question: str = ""
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _first_if_list(cls, value: object) -> object:
+        # One source per answer is our rule, not the model's choice.
+        if isinstance(value, list):
+            return value[0] if value else None
+        return value
+
+
+async def pick_document(
+    question: str, documents: list[ContextDocument], previous_questions: list[str]
+) -> Pick:
+    """Step 1: choose the ONE document that answers. Writes no answer text.
+
+    Only earlier *questions* are shown, never earlier answers: those came from
+    other documents, and their facts must not leak into this answer.
+    """
+    history = ""
+    if previous_questions:
+        history = prompts.PREVIOUS_QUESTIONS.format(questions="\n".join(previous_questions))
+    data = await _complete_json(
+        settings.groq_model,
+        prompts.PICK_SYSTEM,
+        prompts.PICK_USER.format(
+            documents="\n\n".join(_document_block(d) for d in documents),
+            history=history,
+            question=question,
+        ),
+    )
+    try:
+        parsed = _PickJSON.model_validate(data)
+    except ValidationError as e:
+        raise LLMError(f"Unexpected pick format: {data!r}") from e
+
+    standalone = parsed.question.strip() or question
+    if parsed.status is not PickStatus.FOUND:
+        return Pick(parsed.status, None, standalone)
+    # Only a real document number: never cite something we didn't provide.
+    if parsed.source not in {d.number for d in documents}:
+        return Pick(PickStatus.NOT_FOUND, None, standalone)
+    return Pick(PickStatus.FOUND, parsed.source, standalone)
 
 
 class _AnswerJSON(BaseModel):
-    answer: str
-    used: list[int] = []
+    found: bool
+    answer: str = ""
 
 
-async def answer_question(
-    question: str, documents: list[ContextDocument], history: list[Turn] | None = None
-) -> Answer:
-    blocks = "\n\n".join(
-        f"<документ номер={d.number}>\nНазва: «{d.title}»\nДля: {d.level}\n{d.text}\n</документ>"
-        for d in documents
-    )
-    history_text = ""
-    if history:
-        turns = "\n".join(f"Звір: {t.question}\nТи: {t.answer}" for t in history)
-        history_text = prompts.HISTORY.format(turns=turns)
+async def answer_from_document(question: str, document: ContextDocument) -> str | None:
+    """Step 2: answer from this one document only. None = it doesn't answer the question.
+
+    The model sees no other document and no chat history, so it has nothing to mix in.
+    """
     data = await _complete_json(
         settings.groq_model,
         prompts.ANSWER_SYSTEM,
-        prompts.ANSWER_USER.format(documents=blocks, history=history_text, question=question),
+        prompts.ANSWER_USER.format(document=_document_block(document), question=question),
     )
     try:
         parsed = _AnswerJSON.model_validate(data)
     except ValidationError as e:
         raise LLMError(f"Unexpected answer format: {data!r}") from e
-    valid = {d.number for d in documents}
-    # Keep only real document numbers: never cite something we didn't provide.
-    used = list(dict.fromkeys(n for n in parsed.used if n in valid))
-    return Answer(text=parsed.answer.strip(), used=used)
+    text = parsed.answer.strip()
+    return text if parsed.found and text else None
 
 
 # --- choosing documents ---
