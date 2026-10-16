@@ -10,6 +10,6 @@ class Settings(BaseSettings):
 
     bot_token: SecretStr
     groq_api_key: SecretStr
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
 settings = Settings()
