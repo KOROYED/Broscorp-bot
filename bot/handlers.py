@@ -48,7 +48,7 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 GREETING = """\
 Привіт! Я зберігаю поради звірів нашого лісу 🌲
 
-Питай мене про життя в рукавичках, і я відповім з порад, указавши, звідки взяв відповідь. \
+Питай мене про життя в лісі, і я відповім. \
 Наприклад: «Скільки внесок під дубом?»
 
 Маєш корисну пораду? Надішли її файлом: PDF, Word або текстовим."""
@@ -184,6 +184,15 @@ async def _process_upload(
     except LLMError:
         logger.exception("Classification failed for %s", filename)
         await message.answer("Не вдалося обробити документ. Спробуй надіслати його ще раз за хвилину.")
+        return
+
+    if classification.has_instructions:
+        # Defence in depth against prompt injection: such text would try to steer answers.
+        logger.warning("Rejected upload %s: contains instructions to the bot", filename)
+        await message.answer(
+            "У документі є вказівки для бота, а не поради звірам, тож я його не збережу. "
+            "Прибери їх і надішли документ ще раз."
+        )
         return
 
     upload = {

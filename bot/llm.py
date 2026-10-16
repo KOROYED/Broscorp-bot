@@ -95,7 +95,8 @@ async def answer_question(
     question: str, documents: list[ContextDocument], history: list[Turn] | None = None
 ) -> Answer:
     blocks = "\n\n".join(
-        f"[Документ {d.number}] «{d.title}» — для: {d.level}\n{d.text}" for d in documents
+        f"<документ номер={d.number}>\nНазва: «{d.title}»\nДля: {d.level}\n{d.text}\n</документ>"
+        for d in documents
     )
     history_text = ""
     if history:
@@ -151,11 +152,14 @@ async def select_documents(
 class Classification:
     title: str
     scope: Scope | None  # None = unclear; the bot must ask the sender, never guess
+    # The text tries to instruct the bot (prompt injection): such uploads are rejected.
+    has_instructions: bool = False
 
 
 class _ClassifyJSON(BaseModel):
     title: str
     scope: str
+    has_instructions: bool = False
 
 
 def parse_scope(value: str) -> Scope | None:
@@ -178,4 +182,6 @@ async def classify_document(filename: str, text: str) -> Classification:
     except ValidationError as e:
         raise LLMError(f"Unexpected classification format: {data!r}") from e
     title = parsed.title.strip().strip("«»\"'") or filename.rsplit(".", 1)[0]
-    return Classification(title=title, scope=parse_scope(parsed.scope))
+    return Classification(
+        title=title, scope=parse_scope(parsed.scope), has_instructions=parsed.has_instructions
+    )
