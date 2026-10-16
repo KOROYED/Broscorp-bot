@@ -1,0 +1,19 @@
+[project]
+name = "broscorptesttask"
+version = "0.1.0"
+description = "Telegram bot powered by Groq LLM"
+readme = "README.md"
+authors = [
+    { name = "Andrew", email = "koroyed3883@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.31.0",
+    "groq>=1.7.0",
+    "pydantic-settings>=2.16.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
