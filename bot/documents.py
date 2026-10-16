@@ -153,25 +153,6 @@ async def active_documents(
     return docs
 
 
-async def user_documents(session: AsyncSession, telegram_id: int) -> list[Document]:
-    query = (
-        select(Document)
-        .where(Document.is_active, Document.author_id == telegram_id)
-        .order_by(Document.sent_at.desc())
-    )
-    return list(await session.scalars(query))
-
-
-async def delete_document(session: AsyncSession, doc_id: int, telegram_id: int) -> bool:
-    """Deactivate a document. Only its author may do this (decision for the client)."""
-    doc = await session.get(Document, doc_id)
-    if doc is None or not doc.is_active or doc.author_id != telegram_id:
-        return False
-    doc.is_active = False
-    await session.commit()
-    return True
-
-
 # --- citations ---
 
 

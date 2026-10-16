@@ -34,9 +34,8 @@ they still need her confirmation.
   the old one. Anyone may replace; the answer cites the new sender and time.
 - **Decision.** "Same document" = same title (ignoring the place name, case and punctuation) + same
   place/area. The bot tells the sender when their upload replaced an older version.
-- **Decision.** Deleting: an animal can delete only documents they sent (`/delete`). A wrong document
-  from someone else is fixed by sending a corrected version, which replaces it. Archive documents
-  can be replaced the same way but not deleted.
+- **Confirmed.** No commands: a plain text message is a question, an uploaded file is advice.
+  A wrong document is fixed by sending a corrected version, which replaces it.
 - **Decision.** Unsupported or unreadable files get an explanation: wrong format (and which formats
   work), old `.doc` (save as .docx/PDF), empty file, damaged file. Scanned PDFs are read with OCR.
 - **Decision.** The exact same file sent twice is recognized and not stored again.
@@ -64,8 +63,6 @@ they still need her confirmation.
 - **Decision.** Comparison questions («де найменший внесок?») compare all places that have documents.
 - **Decision.** If the LLM is unavailable: «Зараз не можу відповісти… спробуй за хвилину». The error
   is logged.
-- **Decision.** Commands: `/start` `/help`, `/docs` (all documents by place), `/name` (change name),
-  `/delete`, `/cancel`.
 
 ## Open questions
 

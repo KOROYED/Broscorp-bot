@@ -7,7 +7,6 @@ from bot.documents import (
     SOURCE_ARCHIVE,
     SOURCE_USER,
     active_documents,
-    delete_document,
     format_citation,
     normalize_title,
     save_document,
@@ -61,14 +60,6 @@ async def test_animal_can_replace_archive_document(session):
     archive = await save(session, "Членські внески", source=SOURCE_ARCHIVE)
     result = await save(session, "Членські внески", author_id=1)
     assert result.replaced.id == archive.document.id
-
-
-async def test_only_author_can_delete(session):
-    await set_user_name(session, 1, "Їжак")
-    doc = (await save(session, "Порада", author_id=1)).document
-    assert not await delete_document(session, doc.id, telegram_id=2)
-    assert await delete_document(session, doc.id, telegram_id=1)
-    assert await active_documents(session) == []
 
 
 async def test_citation_for_animal_document_has_author_and_kyiv_time(session):

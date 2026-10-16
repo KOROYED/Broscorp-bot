@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, ErrorEvent
+from aiogram.types import ErrorEvent
 
 from bot.archive import import_archive
 from bot.config import settings
@@ -12,14 +12,6 @@ from bot.handlers import router
 from bot.memory import ChatMemory
 
 logger = logging.getLogger(__name__)
-
-COMMANDS = [
-    BotCommand(command="help", description="Як користуватися ботом"),
-    BotCommand(command="docs", description="Усі документи лісу"),
-    BotCommand(command="name", description="Змінити своє ім’я"),
-    BotCommand(command="delete", description="Видалити свій документ"),
-    BotCommand(command="cancel", description="Скасувати поточну дію"),
-]
 
 
 async def on_error(event: ErrorEvent) -> None:
@@ -54,7 +46,6 @@ async def main() -> None:
     dp.include_router(router)
     dp.errors.register(on_error)
 
-    await bot.set_my_commands(COMMANDS)
     try:
         await dp.start_polling(bot)
     finally:

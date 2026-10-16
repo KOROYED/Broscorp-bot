@@ -34,12 +34,12 @@ Missing or empty required variables stop the bot at startup with a clear error.
 
 ## Using the bot
 
-- **Ask**: any text message is a question. Name the place: «що їсти біля мурашника?».
-  Follow-ups work: «а до якого числа?» keeps the place from the previous question.
+There are no commands: **any text message is a question, any file is advice.**
+
+- **Ask**: name the place, e.g. «що їсти біля мурашника?». Follow-ups work: «а до якого числа?»
+  keeps the place from the previous question.
 - **Share advice**: send a PDF, Word (.docx) or .txt file. On the first upload the bot asks your
   name. It works out the place from the document; if it's unclear it **asks you** (buttons), never guesses.
-- `/docs` all documents, `/name` change your name, `/delete` delete a document you sent,
-  `/cancel`, `/help`.
 
 ## How it works
 

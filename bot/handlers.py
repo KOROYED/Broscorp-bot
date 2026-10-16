@@ -10,7 +10,7 @@ from datetime import datetime
 
 from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
-from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
+from aiogram.filters import CommandStart
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -21,17 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bot import qa
 from bot.config import settings
-from bot.db import Document
 from bot.documents import (
     SOURCE_USER,
-    active_documents,
-    delete_document,
     file_hash,
     find_active_by_hash,
     get_user,
     save_document,
     set_user_name,
-    user_documents,
 )
 from bot.llm import LLMError, classify_document
 from bot.memory import ChatMemory
@@ -49,22 +45,13 @@ MAX_FILE_SIZE = 20 * 1024 * 1024
 MAX_NAME_LENGTH = 50
 TELEGRAM_MESSAGE_LIMIT = 4096
 
-HELP = """\
-Привіт! Я бот-порадник лісу 🌲
+GREETING = """\
+Привіт! Я зберігаю поради звірів нашого лісу 🌲
 
-❓ Питай звичайним повідомленням і назви рукавичку, наприклад:
-«Скільки внесок під дубом і до якого числа?»
-Я відповідаю лише з документів лісу й завжди кажу, з якого документа взяв відповідь.
+Питай мене про життя в рукавичках, і я відповім з порад, указавши, звідки взяв відповідь. \
+Наприклад: «Скільки внесок під дубом?»
 
-📄 Щоб поділитися порадою, надішли документ: PDF, Word (.docx) або текстовий файл.
-Новіша версія того самого документа для того самого місця замінює стару.
-
-Команди:
-/docs — усі документи лісу
-/name — змінити своє ім’я
-/delete — видалити документ, який ти надіслав
-/cancel — скасувати поточну дію
-/help — ця підказка"""
+Маєш корисну пораду? Надішли її файлом: PDF, Word або текстовим."""
 
 LLM_UNAVAILABLE = "Зараз не можу відповісти: щось із моїм розумом 🧠. Спробуй, будь ласка, за хвилину."
 
@@ -78,82 +65,12 @@ class ScopeChoice(CallbackData, prefix="scope"):
     index: int  # position in ALL_SCOPES; callback data is limited to 64 bytes
 
 
-class DeleteChoice(CallbackData, prefix="del"):
-    doc_id: int
-
-
-# --- commands ---
-
-
+# Telegram sends /start when an animal opens the bot. No other commands:
+# plain text is always a question, a file is always advice (client's spec).
 @router.message(CommandStart())
-@router.message(Command("help"))
-async def cmd_help(message: Message, state: FSMContext) -> None:
+async def on_start(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(HELP)
-
-
-@router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: FSMContext) -> None:
-    await state.clear()
-    await message.answer("Скасовано. Можеш питати або надсилати документи.")
-
-
-@router.message(Command("name"))
-async def cmd_name(
-    message: Message,
-    command: CommandObject,
-    state: FSMContext,
-    session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    if command.args:
-        await _save_name(message, command.args, session_factory)
-        return
-    await state.set_state(Upload.waiting_name)
-    await message.answer("Як тебе звати?")
-
-
-@router.message(Command("docs"))
-async def cmd_docs(
-    message: Message, session_factory: async_sessionmaker[AsyncSession]
-) -> None:
-    async with session_factory() as session:
-        docs = await active_documents(session)
-    for chunk in _split(_format_catalog(docs)):
-        await message.answer(chunk)
-
-
-@router.message(Command("delete"))
-async def cmd_delete(
-    message: Message, session_factory: async_sessionmaker[AsyncSession]
-) -> None:
-    async with session_factory() as session:
-        docs = await user_documents(session, message.from_user.id)
-    if not docs:
-        await message.answer("Ти ще не надсилав документів, які можна видалити.")
-        return
-    builder = InlineKeyboardBuilder()
-    for doc in docs:
-        builder.button(
-            text=f"«{doc.title}» — {doc.scope.label}", callback_data=DeleteChoice(doc_id=doc.id)
-        )
-    builder.adjust(1)
-    await message.answer(
-        "Який документ видалити? Можна видаляти лише ті, що надіслав ти.",
-        reply_markup=builder.as_markup(),
-    )
-
-
-@router.callback_query(DeleteChoice.filter())
-async def on_delete(
-    callback: CallbackQuery,
-    callback_data: DeleteChoice,
-    session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    async with session_factory() as session:
-        deleted = await delete_document(session, callback_data.doc_id, callback.from_user.id)
-    text = "Документ видалено." if deleted else "Цей документ уже видалено або замінено."
-    await callback.message.edit_text(text)
-    await callback.answer()
+    await message.answer(GREETING)
 
 
 # --- uploading documents ---
@@ -193,7 +110,7 @@ async def on_document(
     await _process_upload(message, bot, state, session_factory, pending)
 
 
-@router.message(Upload.waiting_name, F.text, ~F.text.startswith("/"))
+@router.message(Upload.waiting_name, F.text)
 async def on_name(
     message: Message,
     bot: Bot,
@@ -210,7 +127,7 @@ async def on_name(
 
 @router.message(Upload.waiting_name)
 async def on_name_other(message: Message) -> None:
-    await message.answer("Напиши, будь ласка, своє ім’я текстом. Або /cancel, щоб скасувати.")
+    await message.answer("Напиши, будь ласка, своє ім’я текстом.")
 
 
 @router.callback_query(Upload.waiting_scope, ScopeChoice.filter())
@@ -229,11 +146,6 @@ async def on_scope(
     scope = ALL_SCOPES[callback_data.index]
     await callback.message.edit_text(f"Дякую! Місце: {scope.label}.")
     await _save_upload(callback.message, callback.from_user.id, session_factory, upload, scope)
-
-
-@router.message(Upload.waiting_scope)
-async def on_scope_other(message: Message) -> None:
-    await message.answer("Спершу обери кнопкою вище, для якого місця ця порада. Або /cancel.")
 
 
 @router.callback_query(ScopeChoice.filter())
@@ -354,7 +266,9 @@ async def on_voice(message: Message) -> None:
 # --- questions ---
 
 
-@router.message(StateFilter(None), F.text)
+# Any state except waiting_name (handled above): while the place buttons are
+# shown, the animal can still ask questions.
+@router.message(F.text)
 async def on_question(
     message: Message,
     bot: Bot,
@@ -374,27 +288,10 @@ async def on_question(
 
 @router.message()
 async def on_other(message: Message) -> None:
-    await message.answer("Я розумію текстові питання й документи PDF, Word (.docx) або .txt. Деталі — /help")
+    await message.answer("Я розумію текстові питання й поради у файлах PDF, Word (.docx) або .txt.")
 
 
 # --- formatting helpers ---
-
-
-def _format_catalog(docs: list[Document]) -> str:
-    if not docs:
-        return "Документів поки немає."
-    lines = [f"Документи лісу ({len(docs)}):"]
-    for scope in reversed(ALL_SCOPES):  # whole forest first, then areas, then places
-        in_scope = [d for d in docs if d.scope == scope]
-        if not in_scope:
-            continue
-        lines.append(f"\n{scope.label.capitalize()}:")
-        for doc in in_scope:
-            line = f"• {doc.title}"
-            if doc.source == SOURCE_USER and doc.author is not None:
-                line += f" (надіслав {doc.author.name}, {doc.sent_at.astimezone(settings.tz):%d.%m})"
-            lines.append(line)
-    return "\n".join(lines)
 
 
 def _split(text: str, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list[str]:
