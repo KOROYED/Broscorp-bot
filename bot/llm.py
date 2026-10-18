@@ -61,6 +61,13 @@ async def _complete_json(model: str, system: str, user: str) -> dict:
     return data
 
 
+def _first_item(value: object) -> object:
+    """The model may send a list where one number is asked for: keep only the first."""
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
 def _is_json_failure(error: groq.BadRequestError) -> bool:
     body = error.body if isinstance(error.body, dict) else {}
     inner = body.get("error", body)
@@ -105,11 +112,9 @@ class _PickJSON(BaseModel):
 
     @field_validator("source", mode="before")
     @classmethod
-    def _first_if_list(cls, value: object) -> object:
+    def _one_source(cls, value: object) -> object:
         # One source per answer is our rule, not the model's choice.
-        if isinstance(value, list):
-            return value[0] if value else None
-        return value
+        return _first_item(value)
 
 
 async def pick_document(
@@ -237,3 +242,36 @@ async def classify_document(filename: str, text: str) -> Classification:
     return Classification(
         title=title, scope=parse_scope(parsed.scope), has_instructions=parsed.has_instructions
     )
+
+
+# --- new versions of existing advice ---
+
+
+class _VersionJSON(BaseModel):
+    version_of: int | None = None
+
+    @field_validator("version_of", mode="before")
+    @classmethod
+    def _one_document(cls, value: object) -> object:
+        return _first_item(value)
+
+
+async def find_previous_version(title: str, text: str, existing_titles: list[str]) -> int | None:
+    """Which existing advice (1-based number in `existing_titles`) the upload is a new
+    version of, or None. Only a suggestion: the sender confirms it with a button."""
+    if not existing_titles:
+        return None
+    catalog = "\n".join(f"{i}. «{t}»" for i, t in enumerate(existing_titles, start=1))
+    data = await _complete_json(
+        settings.groq_router_model,
+        prompts.VERSION_SYSTEM,
+        prompts.VERSION_USER.format(
+            existing=catalog, title=title, text=text[:CLASSIFY_MAX_CHARS]
+        ),
+    )
+    try:
+        number = _VersionJSON.model_validate(data).version_of
+    except ValidationError as e:
+        raise LLMError(f"Unexpected version format: {data!r}") from e
+    # Only a number we sent: never point at a document that wasn't offered.
+    return number if number in range(1, len(existing_titles) + 1) else None

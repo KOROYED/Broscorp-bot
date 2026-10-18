@@ -19,14 +19,16 @@ KYIV = ZoneInfo("Europe/Kyiv")
 OAK = place_scope("Під дубом")
 
 
-async def save(session, title, scope=OAK, source=SOURCE_USER, author_id=None, **kw):
+async def save(
+    session, title, scope=OAK, source=SOURCE_USER, author_id=None, text_suffix="", **kw
+):
     return await save_document(
         session,
         title=title,
         scope=scope,
         text=f"text of {title}",
         source=source,
-        content_hash=f"hash-{title}-{scope}",
+        content_hash=f"hash-{title}-{scope}{text_suffix}",
         author_id=author_id,
         **kw,
     )
@@ -60,6 +62,37 @@ async def test_animal_can_replace_archive_document(session):
     archive = await save(session, "Членські внески", source=SOURCE_ARCHIVE)
     result = await save(session, "Членські внески", author_id=1)
     assert result.replaced.id == archive.document.id
+
+
+async def test_confirmed_new_version_replaces_that_exact_document(session):
+    fees = await save(session, "Членські внески")
+    rules = await save(session, "Правила співжиття")
+    # Different title, so only the sender's «Так, заміни» links it to «Членські внески».
+    result = await save(session, "Внески на зиму", replace_id=fees.document.id)
+
+    assert result.replaced.id == fees.document.id
+    assert result.replaced.replaced_by_id == result.document.id
+    active = await active_documents(session)
+    assert [d.id for d in active] == [rules.document.id, result.document.id]
+
+
+async def test_replace_id_of_already_replaced_document_replaces_nothing(session):
+    old = await save(session, "Членські внески")
+    newer = await save(session, "Членські внески", text_suffix="v2")
+    # The sender confirmed against `old`, but someone replaced it in the meantime.
+    result = await save(session, "Внески на зиму", replace_id=old.document.id)
+
+    assert result.replaced is None
+    # `old` keeps pointing at the version that really replaced it.
+    assert old.document.replaced_by_id == newer.document.id
+    assert len(await active_documents(session)) == 2
+
+
+async def test_without_replace_id_a_different_title_is_kept_separate(session):
+    await save(session, "Членські внески")
+    result = await save(session, "Внески на зиму")
+    assert result.replaced is None
+    assert len(await active_documents(session)) == 2
 
 
 async def test_citation_for_animal_document_has_author_and_kyiv_time(session):

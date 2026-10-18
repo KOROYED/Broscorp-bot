@@ -90,14 +90,22 @@ async def save_document(
     author_id: int | None = None,
     archive_key: str | None = None,
     sent_at: datetime | None = None,
+    replace_id: int | None = None,
 ) -> SaveResult:
     """Store a document. An active one with the same topic and scope is replaced.
 
     "Same document" = same normalized title + same scope (client: newer version
     of the same advice for the same place replaces the old one, anyone may replace).
+    `replace_id`: the sender confirmed this is a new version of that exact document,
+    though its title differs; that row is replaced instead (if it's still active).
     """
     norm = normalize_title(title)
-    old = await find_active_version(session, scope, norm)
+    if replace_id is not None:
+        old = await session.get(Document, replace_id)
+        if old is not None and not old.is_active:
+            old = None  # someone replaced it meanwhile; never revive or re-link old rows
+    else:
+        old = await find_active_version(session, scope, norm)
 
     doc = Document(
         title=title,
@@ -168,12 +176,17 @@ def format_citation(doc: Document, tz: ZoneInfo) -> str:
     elif doc.scope_kind == ScopeKind.AREA and not _mentions_area(doc.title, doc.scope_value):
         parts += f" ({doc.scope.label})"
     if doc.source == SOURCE_USER and doc.author is not None:
-        sent_at = doc.sent_at
-        if sent_at.tzinfo is None:  # SQLite drops tzinfo; we always store UTC
-            sent_at = sent_at.replace(tzinfo=UTC)
-        sent = sent_at.astimezone(tz)
-        parts += f", надіслав {doc.author.name}, {sent:%d.%m} о {sent:%H:%M}"
+        parts += f", надіслав {doc.author.name}, {format_sent_at(doc, tz)}"
     return parts
+
+
+def format_sent_at(doc: Document, tz: ZoneInfo) -> str:
+    """Sending time as animals see it: «12.10 о 14:30», in the forest's timezone."""
+    sent_at = doc.sent_at
+    if sent_at.tzinfo is None:  # SQLite drops tzinfo; we always store UTC
+        sent_at = sent_at.replace(tzinfo=UTC)
+    sent = sent_at.astimezone(tz)
+    return f"{sent:%d.%m} о {sent:%H:%M}"
 
 
 _AREA_STEMS = {Area.CONIFEROUS: "хвойн", Area.DECIDUOUS: "листян", Area.RIVER: "річ"}
