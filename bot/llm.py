@@ -127,7 +127,11 @@ async def pick_document(
     """
     history = ""
     if previous_questions:
-        history = prompts.PREVIOUS_QUESTIONS.format(questions="\n".join(previous_questions))
+        # Oldest → newest, latest marked: a follow-up refers to the latest question,
+        # even if earlier ones were mostly about another topic.
+        lines = [f"{i}. {q}" for i, q in enumerate(previous_questions, start=1)]
+        lines[-1] += " ← останнє"
+        history = prompts.PREVIOUS_QUESTIONS.format(questions="\n".join(lines))
     data = await _complete_json(
         settings.groq_model,
         prompts.PICK_SYSTEM,

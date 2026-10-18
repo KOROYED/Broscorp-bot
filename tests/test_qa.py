@@ -167,3 +167,26 @@ async def test_answer_from_document(model_reply, expected):
         assert await answer_from_document("Питання?", DOCUMENTS[1]) == expected
     prompt = complete.call_args.args[2]
     assert "<документ номер=2>" in prompt and "<документ номер=1>" not in prompt
+
+
+async def test_pick_shows_previous_questions_in_order_with_latest_marked():
+    # The real bug: two fee questions, then the festival one; «до якої дати?» is about the festival.
+    previous = [
+        "скільки внесок під дубом?",
+        "скільки внесок під дубом?",
+        "що приносити на свято врожаю під дубом?",
+    ]
+    reply = {"status": "found", "source": 1, "question": "До якої дати свято врожаю під дубом?"}
+    complete = AsyncMock(return_value=reply)
+    with patch("bot.llm._complete_json", complete):
+        await pick_document("до якої дати?", DOCUMENTS, previous)
+
+    prompt = complete.call_args.args[2]
+    assert (
+        "1. скільки внесок під дубом?\n"
+        "2. скільки внесок під дубом?\n"
+        "3. що приносити на свято врожаю під дубом? ← останнє\n"
+    ) in prompt
+    assert prompt.count("← останнє") == 1
+    # Earlier answers never reach the prompt; the new question comes after the history.
+    assert prompt.index("← останнє") < prompt.index("Питання звіра: до якої дати?")
