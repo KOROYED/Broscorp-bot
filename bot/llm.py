@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # AsyncGroq, because a sync call would block the event loop for every user.
 client = AsyncGroq(api_key=settings.groq_api_key.get_secret_value())
 
+# Must be ≥ qa.MAX_DOCUMENT_CHARS: the answer step must never see text the injection check skipped.
 CLASSIFY_MAX_CHARS = 6000
 
 
