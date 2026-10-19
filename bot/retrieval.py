@@ -107,7 +107,7 @@ def level_label(scope: Scope) -> str:
 
 # --- lexical search ---
 
-# Ukrainian words change endings (внесок / внески / внеску), so words are
+# Ukrainian words change endings (горіх / горіхи / горіхів), so words are
 # compared by their first letters: a crude but predictable stem.
 STEM_LENGTH = 5
 TITLE_WEIGHT = 3
