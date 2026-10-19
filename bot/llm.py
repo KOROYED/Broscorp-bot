@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # AsyncGroq, because a sync call would block the event loop for every user.
 client = AsyncGroq(api_key=settings.groq_api_key.get_secret_value())
 
-CLASSIFY_MAX_CHARS = 4000
+CLASSIFY_MAX_CHARS = 6000
 
 
 class LLMError(Exception):
