@@ -9,10 +9,16 @@ they still need her confirmation.
 - **Confirmed.** Animals send documents with advice; others ask questions and get answers taken
   from those documents, **always with the source**.
 - **Confirmed.** Users are all forest animals. Everyone is equal: no admins, no permissions.
+- **Confirmed.** The bot works in private chats only; group chats are not required.
+- **Decision.** Number of concurrent users was left to me. The bot is sized for a forest community of
+  tens of animals asking at the same time; the main limit is the Groq free tier. See README →
+  "Limitations and scaling" for what would change at a larger scale.
 
 ## Documents
 
 - **Confirmed.** Formats: PDF, Word, plain text. No photos of documents, no voice messages.
+- **Confirmed.** Advice is accepted only as a file (PDF, Word .docx, plain text .txt). A plain text
+  message is always a question, never advice.
 - **Confirmed.** On an animal's first upload the bot asks «Як тебе звати?» and remembers the real
   name. The date and time of sending are stored.
 - **Confirmed.** A рукавичка is a physical place in the forest where animals live and have their
@@ -51,7 +57,11 @@ they still need her confirmation.
 - **Confirmed.** Standard documents are in the Google Drive folder «Лісовий архів». The bot knows them
   from the start; nobody uploads them via Telegram. Citations show the title (and place) only.
 - **Decision.** The folder (78 files, about 20 of them scans) is snapshotted into the repository and
-  imported at startup.
+  imported at startup. The client left syncing with Google Drive to me: no sync, because the archive
+  changes rarely and a sync would need Google API credentials and handling of renamed and deleted files.
+  When the archive changes, the snapshot is updated; restarts import only changed files.
+- **Confirmed.** The archive has fewer than 100 documents. In autumn animals send a few new ones every
+  day, so a few hundred per season.
 
 ## Questions and answers
 
@@ -76,11 +86,9 @@ they still need her confirmation.
   (see above). The citation line keeps the confirmed format.
 - **Decision.** If the LLM is unavailable: «Ох, щось я задумався й загубив думку… Спитай мене ще раз за хвилинку». The error
   is logged.
+- **Decision.** Times in citations are shown in Kyiv time (Europe/Kyiv). The client left the timezone
+  to me; it's configurable with the `TIMEZONE` environment variable.
 
 ## Open questions
 
-1. Is «Лісовий архів» static, or will it be updated (does the bot need to sync with Drive)?
-2. Private chats only, or also a group chat? (Currently private chats.)
-3. If someone sends advice as plain text instead of a document? (Currently treated as a question.)
-4. Expected number and size of documents?
-5. Timezone for times (Kyiv assumed).
+None: every question was either answered by the client or left to me (see **Decision** items).

@@ -42,7 +42,7 @@ from bot.places import ALL_SCOPES, Scope
 logger = logging.getLogger(__name__)
 
 router = Router()
-# Private chats only (decision to confirm with the client).
+# Private chats only.
 router.message.filter(F.chat.type == ChatType.PRIVATE)
 
 # Telegram bots can download files up to 20 MB.
