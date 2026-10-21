@@ -88,6 +88,8 @@ restarts don't re-run OCR, and an archive document replaced by an animal isn't b
 - **PostgreSQL + Docker volume**: documents and names survive restarts. Tables are created with
   `create_all`; a real project would add Alembic migrations.
 - **Conversation memory** is in-process (last 3 turns per chat): it only serves follow-up questions.
+- **Late confirmations**: if a document was replaced while the sender was still deciding on «Так»,
+  the newest version is replaced instead, so only one version stays active.
 
 ## Limitations and scaling
 
@@ -102,11 +104,6 @@ Known limitations, and what I'd change next:
   animal's answer (their name, the place, or «Так/Ні»), the pending upload is lost and follow-up
   questions lose their context. Fix: aiogram's `RedisStorage` and a Redis-backed memory, so both
   survive restarts.
-- **Confirming a replacement too late:** when the bot asks «…нова версія?», it remembers which
-  document to replace. If another animal replaces that same document before the first one presses
-  «Так», the first animal's advice is saved next to the newer version instead of replacing it, so two
-  versions stay active. It's rare (two updates of the same advice within minutes). Fix: follow
-  `replaced_by_id` from the remembered document to the version that is active now, and replace that one.
 - **Tests run on SQLite**, production on Postgres. SQLite is fast and needs no server, but it's more
   forgiving: by default it doesn't enforce foreign keys, so a document pointing to a user who doesn't
   exist passes the tests and fails in production. Fix: run the same tests against Postgres with

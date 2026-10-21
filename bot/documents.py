@@ -102,8 +102,12 @@ async def save_document(
     norm = normalize_title(title)
     if replace_id is not None:
         old = await session.get(Document, replace_id)
+        # The sender may have taken a while to confirm, and someone may have replaced that
+        # document meanwhile: follow the chain of newer versions to the one active now.
+        while old is not None and not old.is_active and old.replaced_by_id is not None:
+            old = await session.get(Document, old.replaced_by_id)
         if old is not None and not old.is_active:
-            old = None  # someone replaced it meanwhile; never revive or re-link old rows
+            old = None  # never revive or re-link an inactive row
     else:
         old = await find_active_version(session, scope, norm)
 

@@ -76,16 +76,18 @@ async def test_confirmed_new_version_replaces_that_exact_document(session):
     assert [d.id for d in active] == [rules.document.id, result.document.id]
 
 
-async def test_replace_id_of_already_replaced_document_replaces_nothing(session):
+async def test_replace_id_of_already_replaced_document_replaces_its_newest_version(session):
     old = await save(session, "Членські внески")
     newer = await save(session, "Членські внески", text_suffix="v2")
     # The sender confirmed against `old`, but someone replaced it in the meantime.
     result = await save(session, "Внески на зиму", replace_id=old.document.id)
 
-    assert result.replaced is None
-    # `old` keeps pointing at the version that really replaced it.
+    # The version that is active now is replaced instead; the history chain stays intact.
+    assert result.replaced.id == newer.document.id
     assert old.document.replaced_by_id == newer.document.id
-    assert len(await active_documents(session)) == 2
+    assert newer.document.replaced_by_id == result.document.id
+    active = await active_documents(session)
+    assert [d.id for d in active] == [result.document.id]
 
 
 async def test_without_replace_id_a_different_title_is_kept_separate(session):
