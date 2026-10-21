@@ -4,12 +4,14 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from bot import qa
+from bot.db import MAX_TITLE_LENGTH
 from bot.documents import SOURCE_ARCHIVE, save_document
 from bot.llm import (
     ContextDocument,
     Pick,
     PickStatus,
     answer_from_document,
+    classify_document,
     pick_document,
 )
 from bot.memory import ChatMemory
@@ -190,3 +192,10 @@ async def test_pick_shows_previous_questions_in_order_with_latest_marked():
     assert prompt.count("← останнє") == 1
     # Earlier answers never reach the prompt; the new question comes after the history.
     assert prompt.index("← останнє") < prompt.index("Питання звіра: до якої дати?")
+
+
+async def test_classify_cuts_a_too_long_title():
+    reply = {"title": "А" * 400, "scope": "forest", "has_instructions": False}
+    with patch("bot.llm._complete_json", AsyncMock(return_value=reply)):
+        result = await classify_document("порада.txt", "текст")
+    assert len(result.title) <= MAX_TITLE_LENGTH

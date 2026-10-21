@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from bot import prompts
 from bot.config import settings
+from bot.db import MAX_TITLE_LENGTH
 from bot.places import FOREST, PLACES, Area, Scope, area_scope, place_scope
 
 logger = logging.getLogger(__name__)
@@ -244,6 +245,7 @@ async def classify_document(filename: str, text: str) -> Classification:
     except ValidationError as e:
         raise LLMError(f"Unexpected classification format: {data!r}") from e
     title = parsed.title.strip().strip("«»\"'") or filename.rsplit(".", 1)[0]
+    title = title[:MAX_TITLE_LENGTH]
     return Classification(
         title=title, scope=parse_scope(parsed.scope), has_instructions=parsed.has_instructions
     )

@@ -11,6 +11,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from bot.places import Scope, ScopeKind
 
+# Titles come from the LLM; llm.py cuts them to this length so Postgres accepts them.
+MAX_TITLE_LENGTH = 300
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
@@ -33,9 +36,9 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(300))
+    title: Mapped[str] = mapped_column(String(MAX_TITLE_LENGTH))
     # Title normalized for "is this a new version of the same document?" checks.
-    norm_title: Mapped[str] = mapped_column(String(300), index=True)
+    norm_title: Mapped[str] = mapped_column(String(MAX_TITLE_LENGTH), index=True)
     scope_kind: Mapped[str] = mapped_column(String(10))
     scope_value: Mapped[str] = mapped_column(String(50), default="")
     text: Mapped[str] = mapped_column(Text)
