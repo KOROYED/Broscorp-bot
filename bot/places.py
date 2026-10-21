@@ -26,12 +26,6 @@ AREA_NAMES = {
     Area.DECIDUOUS: "листяний ліс",
     Area.RIVER: "біля річки",
 }
-# «Де?» form of each area, for sentences like «У хвойному лісі вже є порада…».
-AREA_WHERE = {
-    Area.CONIFEROUS: "у хвойному лісі",
-    Area.DECIDUOUS: "у листяному лісі",
-    Area.RIVER: "біля річки",
-}
 
 # Fixed list from the client; new places never appear.
 PLACE_AREAS: dict[str, frozenset[Area]] = {
@@ -69,18 +63,6 @@ class Scope:
         if self.kind is ScopeKind.AREA:
             return AREA_NAMES[Area(self.value)]
         return "увесь ліс"
-
-    @property
-    def where(self) -> str:
-        """Answers «де?»: «Під дубом», «у хвойному лісі», «у всьому лісі».
-
-        Place names already are «де?» phrases, so they are used as they are.
-        """
-        if self.kind is ScopeKind.PLACE:
-            return self.value
-        if self.kind is ScopeKind.AREA:
-            return AREA_WHERE[Area(self.value)]
-        return "у всьому лісі"
 
 
 FOREST = Scope(ScopeKind.FOREST)

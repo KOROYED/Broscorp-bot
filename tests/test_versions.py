@@ -1,7 +1,7 @@
 """New versions with a different title: replaced at once, the sender can undo it."""
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -12,7 +12,13 @@ from bot.documents import (
     set_user_name,
     undo_replacement,
 )
-from bot.handlers import Upload, UndoReplace, _previous_version, _save_checking_version
+from bot.handlers import (
+    UndoReplace,
+    Upload,
+    _previous_version,
+    _save_checking_version,
+    on_undo,
+)
 from bot.llm import LLMError, find_previous_version
 from bot.places import FOREST, place_scope
 
@@ -104,10 +110,18 @@ async def test_no_match_or_failed_check_saves_as_before(session, model):
         assert await _previous_version(session, upload("Нічна варта"), OAK) is None
 
 
-def fake_message():
+def fake_message(sent_id=100):
+    """The sender's message; `answer` returns the bot's reply with id `sent_id`."""
     message = AsyncMock()
-    message.answer = AsyncMock()
+    message.answer = AsyncMock(return_value=MagicMock(message_id=sent_id))
     return message
+
+
+def press_undo(on_message_id):
+    """A tap on the undo button under the bot's message `on_message_id`."""
+    callback = AsyncMock()
+    callback.message.message_id = on_message_id
+    return callback
 
 
 def fsm():
@@ -137,8 +151,8 @@ async def test_matched_version_is_replaced_at_once_and_can_be_undone(session_fac
     assert [d.title for d in active] == ["Внески на зиму"]
     new_id = active[0].id
     assert await state.get_state() == Upload.can_undo
-    # Only the new document's id is kept; the button itself carries nothing.
-    assert await state.get_data() == {"new_id": new_id}
+    # Only the new document's id and the undo message's id are kept; the button carries nothing.
+    assert await state.get_data() == {"new_id": new_id, "undo_message_id": 100}
     # Tells the sender what was replaced: title, author and time (Kyiv).
     assert message.answer.call_args.args[0] == (
         "Зберіг пораду «Внески на зиму» (Під дубом). Дякую!\n"
@@ -165,3 +179,37 @@ async def test_no_match_saves_without_undo_button(session_factory):
     assert "reply_markup" not in message.answer.call_args.kwargs
     async with session_factory() as session:
         assert len(await active_documents(session)) == 2
+
+
+async def test_only_the_latest_undo_button_works(session_factory):
+    async with session_factory() as session:
+        fees = await save(session, "Членські внески")
+        guard = await save(session, "Нічна варта")
+    state = fsm()
+    # Each upload matches the first advice still active: «Членські внески», then «Нічна варта».
+    with patch("bot.handlers.find_previous_version", AsyncMock(side_effect=[1, 1])):
+        await _save_checking_version(
+            fake_message(sent_id=101), 7, state, session_factory, upload("Внески на зиму"), OAK
+        )
+        await _save_checking_version(
+            fake_message(sent_id=102), 7, state, session_factory, upload("Хто вартує"), OAK
+        )
+
+    first = press_undo(101)
+    await on_undo(first, state, session_factory)
+    first.answer.assert_called_once_with("Це питання вже минуло.")
+    first.message.edit_text.assert_not_called()
+    async with session_factory() as session:
+        active = {d.id for d in await active_documents(session)}
+    # Nothing undone, and the latest button is still armed.
+    assert fees.id not in active and guard.id not in active
+    assert await state.get_state() == Upload.can_undo
+
+    second = press_undo(102)
+    await on_undo(second, state, session_factory)
+    async with session_factory() as session:
+        active = {d.id for d in await active_documents(session)}
+    assert guard.id in active
+    assert fees.id not in active
+    assert "повернув пораду «Нічна варта»" in second.message.edit_text.call_args.args[0]
+    assert await state.get_state() is None

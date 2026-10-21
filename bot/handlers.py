@@ -178,12 +178,15 @@ async def on_undo(
     state: FSMContext,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    new_id = (await state.get_data()).get("new_id")
+    data = await state.get_data()
+    if data.get("undo_message_id") != callback.message.message_id:
+        # A button under an earlier upload: only the latest one may undo. Keep the state,
+        # so the latest message's button still works.
+        await callback.answer("Це питання вже минуло.")
+        return
+    new_id = data["new_id"]
     await state.clear()
     await callback.answer()
-    if new_id is None:
-        await callback.message.edit_reply_markup(reply_markup=None)
-        return
     async with session_factory() as session:
         result = await undo_replacement(session, new_id)
     if result.restored is not None:
@@ -293,19 +296,20 @@ async def _save_checking_version(
         await message.answer(saved)
         return
 
-    await state.set_state(Upload.can_undo)
-    await state.update_data(new_id=result.document.id)
     if old.author is not None:
         origin = f", яку надіслав {old.author.name}, {format_sent_at(old, settings.tz)}"
     else:
         origin = " з «Лісового архіву»"
     builder = InlineKeyboardBuilder()
     builder.button(text="Ні, це інша порада — поверни стару", callback_data=UndoReplace())
-    await message.answer(
+    sent = await message.answer(
         f"{saved}\nВона замінила пораду «{old.title}»{origin}: "
         "тепер звірі чутимуть лише нову.",
         reply_markup=builder.as_markup(),
     )
+    await state.set_state(Upload.can_undo)
+    # Which message's button may undo: earlier uploads' buttons are stale.
+    await state.update_data(new_id=result.document.id, undo_message_id=sent.message_id)
 
 
 async def _previous_version(session: AsyncSession, upload: dict, scope: Scope) -> Document | None:
