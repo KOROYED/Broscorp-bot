@@ -89,6 +89,33 @@ restarts don't re-run OCR, and an archive document replaced by an animal isn't b
   `create_all`; a real project would add Alembic migrations.
 - **Conversation memory** is in-process (last 3 turns per chat): it only serves follow-up questions.
 
+## Limitations and scaling
+
+Sized for the client's numbers: a few hundred documents per season and tens of animals at once.
+Known limitations, and what I'd change next:
+
+- **Router prompt growth:** the router sees the title of every candidate document, so its prompt
+  grows with each new upload. At a few hundred documents this is the first limit to hit the free
+  tier's 8k tokens/minute. Fix: let BM25 shortlist 30–40 titles first and give the router only
+  those, so the prompt stays the same size however big the archive gets.
+- **FSM state and chat memory** live in the bot's RAM. If the bot restarts while waiting for an
+  animal's answer (their name, the place, or «Так/Ні»), the pending upload is lost and follow-up
+  questions lose their context. Fix: aiogram's `RedisStorage` and a Redis-backed memory, so both
+  survive restarts.
+- **Confirming a replacement too late:** when the bot asks «…нова версія?», it remembers which
+  document to replace. If another animal replaces that same document before the first one presses
+  «Так», the first animal's advice is saved next to the newer version instead of replacing it, so two
+  versions stay active. It's rare (two updates of the same advice within minutes). Fix: follow
+  `replaced_by_id` from the remembered document to the version that is active now, and replace that one.
+- **Tests run on SQLite**, production on Postgres. SQLite is fast and needs no server, but it's more
+  forgiving: by default it doesn't enforce foreign keys, so a document pointing to a user who doesn't
+  exist passes the tests and fails in production. Fix: run the same tests against Postgres with
+  testcontainers, rolling back each test's transaction to keep them isolated.
+- **Long documents:** each document is cut to its first 6000 characters before the model sees it, so
+  advice deep inside a long document can't be answered: the animal is told «нічого не знаю» about
+  something that is stored, and no error shows. Fix: split documents into chunks by section when they
+  are saved, search the chunks, and give the model the best one, still citing the whole document.
+
 ## Development
 
 ```bash
