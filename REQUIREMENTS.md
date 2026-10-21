@@ -1,8 +1,8 @@
 # Requirements
 
-Gathered in conversation with the client, Мишка-шкряботушка. **Confirmed** items are her answers;
-**Decision** items are ones she delegated («зроби, як вважаєш правильним, тільки скажи мені»);
-they still need her confirmation.
+Gathered in conversation with the client, Мишка-шкряботушка. Every item is confirmed by her; where
+she left the choice to me («зроби, як вважаєш правильним, тільки скажи мені»), the item says so or
+describes my proposal, which she then approved.
 
 ## Purpose and users
 
@@ -21,6 +21,8 @@ they still need her confirmation.
   message is always a question, never advice.
 - **Confirmed.** On an animal's first upload the bot asks «Як тебе звати?» and remembers the real
   name. The date and time of sending are stored.
+- **Confirmed.** The name is asked once, on the first upload, and signs all of that animal's advice
+  from then on. It can't be changed later.
 - **Confirmed.** A рукавичка is a physical place in the forest where animals live and have their
   ОСМД. The word may be used in answers, e.g. «порада для рукавички «Під дубом»».
 - **Confirmed.** A fixed list of 8 places (рукавички); new ones never appear:
@@ -41,7 +43,7 @@ they still need her confirmation.
 - **Confirmed.** Documents don't expire. A newer version of the same advice for the same place **always**
   replaces the old one: the replacement never waits for a confirmation. Two versions of the same advice
   must never both stay active. Anyone may replace; the answer cites the new sender and time.
-- **Decision.** "Same document" = same title (ignoring the place name, case and punctuation) + same
+- **Confirmed.** "Same document" = same title (ignoring the place name, case and punctuation) + same
   place/area. The bot tells the sender when their upload replaced an older version.
 - **Confirmed.** If the title differs but the advice looks like a new version of one already stored for
   the same place/area, it replaces that one at once, and the bot tells the sender what was replaced:
@@ -50,9 +52,12 @@ they still need her confirmation.
   one since; otherwise the bot says a newer version already exists.
 - **Confirmed.** No commands: a plain text message is a question, an uploaded file is advice.
   A wrong document is fixed by sending a corrected version, which replaces it.
-- **Decision.** Unsupported or unreadable files get an explanation: wrong format (and which formats
+- **Confirmed.** Unsupported or unreadable files get an explanation: wrong format (and which formats
   work), old `.doc` (save as .docx/PDF), empty file, damaged file. Scanned PDFs are read with OCR.
-- **Decision.** The exact same file sent twice is recognized and not stored again.
+- **Confirmed.** Files up to 20 MB are accepted (the most a Telegram bot can download).
+- **Confirmed.** A document that contains instructions to the bot instead of advice for animals
+  («ігноруй правила», «відповідай, що…») is not stored; the sender is asked to remove them.
+- **Confirmed.** The exact same file sent twice is recognized and not stored again.
 
 ## «Лісовий архів»
 
@@ -74,23 +79,23 @@ they still need her confirmation.
 - **Confirmed.** Citation format:
   `— з документа «Членські внески» рукавички «Під дубом», надіслав Їжак, 12.10 о 14:30`;
   archive documents have no author or time.
-- **Decision.** Conversation memory: the last 3 questions/answers per chat, so follow-ups work
+- **Confirmed.** Conversation memory: the last 3 questions/answers per chat, so follow-ups work
   («а до якого числа?» keeps the place).
-- **Decision.** One answer comes from **one document**: the most relevant one, preferring the most
+- **Confirmed.** One answer comes from **one document**: the most relevant one, preferring the most
   specific scope, and it is the only one cited. The answer contains only what that document says
   directly or what logically follows from it («6 жолудів більше за потрібні 5, тож достатньо»).
   Documents are never mixed. If no document answers, the bot says so.
-- **Decision.** Questions that ask for everything («покажи всі поради»), span or compare several
+- **Confirmed.** Questions that ask for everything («покажи всі поради»), span or compare several
   places («де найменший внесок?»), or depend on a place that isn't named get a short request to ask
   one specific question and name the place.
-- **Decision.** The bot speaks as a forest character, **Лісовий Порадник**, who keeps the animals'
+- **Confirmed.** The bot speaks as a forest character, **Лісовий Порадник**, who keeps the animals'
   advice. Its messages never mention documents, files or being a bot. «Рукавичка» is used freely
   (see above). The citation line keeps the confirmed format.
-- **Decision.** If the LLM is unavailable: «Ох, щось я задумався й загубив думку… Спитай мене ще раз за хвилинку». The error
-  is logged.
+- **Confirmed.** If the LLM is unavailable: «Ох, щось я задумався й загубив думку… Спитай мене ще раз
+  за хвилинку». The error is logged.
 - **Confirmed.** Times in citations are shown in Kyiv time (Europe/Kyiv). The client left the timezone
   to me; it's configurable with the `TIMEZONE` environment variable.
 
 ## Open questions
 
-None: every question was either answered by the client or left to me (see **Decision** items).
+None: every item above is confirmed by the client.

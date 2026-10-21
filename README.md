@@ -7,7 +7,7 @@ question in plain text and gets an answer **only from those documents, always wi
 > **A:** 4 жолуді з дорослого звіра на місяць, здати до 10 числа.
 > — з документа «Членські внески» рукавички «Під дубом»
 
-Requirements gathered from the client, decisions and open questions are in
+All requirements gathered from the client, each confirmed by her, are in
 [REQUIREMENTS.md](REQUIREMENTS.md).
 
 ## Run
