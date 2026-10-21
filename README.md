@@ -88,8 +88,9 @@ restarts don't re-run OCR, and an archive document replaced by an animal isn't b
 - **PostgreSQL + Docker volume**: documents and names survive restarts. Tables are created with
   `create_all`; a real project would add Alembic migrations.
 - **Conversation memory** is in-process (last 3 turns per chat): it only serves follow-up questions.
-- **Late confirmations**: if a document was replaced while the sender was still deciding on «Так»,
-  the newest version is replaced instead, so only one version stays active.
+- **Replace first, undo on «Ні»**: a likely new version under another title replaces the old one at
+  once (the client's rule: a newer version always replaces the old one), and the sender gets one button
+  to undo it. Undo works only while the new version is still the latest; the button carries no ids.
 
 ## Limitations and scaling
 

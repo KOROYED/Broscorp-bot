@@ -38,14 +38,16 @@ they still need her confirmation.
 - **Confirmed.** The place is taken from the document's content or title («під ялинами» = coniferous
   forest). **If unclear, the bot asks the sender. It never guesses.**
 - **Confirmed.** Truthfulness of advice is not checked.
-- **Confirmed.** Documents don't expire. A newer version of the same advice for the same place replaces
-  the old one. Anyone may replace; the answer cites the new sender and time.
+- **Confirmed.** Documents don't expire. A newer version of the same advice for the same place **always**
+  replaces the old one: the replacement never waits for a confirmation. Anyone may replace; the answer
+  cites the new sender and time.
 - **Decision.** "Same document" = same title (ignoring the place name, case and punctuation) + same
   place/area. The bot tells the sender when their upload replaced an older version.
 - **Decision.** If the title differs but the advice looks like a new version of one already stored for
-  the same place/area, the bot asks the sender: «Під дубом уже є порада «Членські внески», яку надіслав
-  Їжак, 12.10 о 14:30. Твоя порада — її нова версія?» [Так, заміни] / [Ні, це інша порада].
-  It never replaces a different title without that confirmation.
+  the same place/area, it replaces that one at once, and the bot tells the sender what was replaced:
+  «Вона замінила пораду «Членські внески», яку надіслав Їжак, 12.10 о 14:30» with one button
+  [Ні, це інша порада — поверни стару]. The old advice comes back only if nobody has replaced the new
+  one since; otherwise the bot says a newer version already exists.
 - **Confirmed.** No commands: a plain text message is a question, an uploaded file is advice.
   A wrong document is fixed by sending a corrected version, which replaces it.
 - **Decision.** Unsupported or unreadable files get an explanation: wrong format (and which formats

@@ -11,6 +11,7 @@ from bot.documents import (
     normalize_title,
     save_document,
     set_user_name,
+    undo_replacement,
 )
 from bot.places import FOREST, Area, area_scope, place_scope
 
@@ -64,10 +65,10 @@ async def test_animal_can_replace_archive_document(session):
     assert result.replaced.id == archive.document.id
 
 
-async def test_confirmed_new_version_replaces_that_exact_document(session):
+async def test_matched_new_version_replaces_that_exact_document(session):
     fees = await save(session, "Членські внески")
     rules = await save(session, "Правила співжиття")
-    # Different title, so only the sender's «Так, заміни» links it to «Членські внески».
+    # Different title, so only the version check links it to «Членські внески».
     result = await save(session, "Внески на зиму", replace_id=fees.document.id)
 
     assert result.replaced.id == fees.document.id
@@ -79,7 +80,7 @@ async def test_confirmed_new_version_replaces_that_exact_document(session):
 async def test_replace_id_of_already_replaced_document_replaces_its_newest_version(session):
     old = await save(session, "Членські внески")
     newer = await save(session, "Членські внески", text_suffix="v2")
-    # The sender confirmed against `old`, but someone replaced it in the meantime.
+    # The check matched `old`, but someone replaced it in the meantime.
     result = await save(session, "Внески на зиму", replace_id=old.document.id)
 
     # The version that is active now is replaced instead; the history chain stays intact.
@@ -95,6 +96,49 @@ async def test_without_replace_id_a_different_title_is_kept_separate(session):
     result = await save(session, "Внески на зиму")
     assert result.replaced is None
     assert len(await active_documents(session)) == 2
+
+
+async def test_undo_brings_back_the_replaced_document(session):
+    fees = await save(session, "Членські внески")
+    new = await save(session, "Внески на зиму", replace_id=fees.document.id)
+    # «Ні, це інша порада — поверни стару»: both live on as separate advice.
+    result = await undo_replacement(session, new.document.id)
+
+    assert result.restored.id == fees.document.id
+    assert result.restored.is_active
+    assert result.restored.replaced_by_id is None
+    active = await active_documents(session)
+    assert [d.id for d in active] == [fees.document.id, new.document.id]
+
+
+async def test_undo_is_refused_when_the_new_document_was_replaced_again(session):
+    fees = await save(session, "Членські внески")
+    new = await save(session, "Внески на зиму", replace_id=fees.document.id)
+    newest = await save(session, "Внески на зиму", text_suffix="v2")
+    result = await undo_replacement(session, new.document.id)
+
+    assert result.restored is None
+    assert result.newer_exists
+    # Nothing changed: only the newest version is active, the history chain is intact.
+    assert fees.document.replaced_by_id == new.document.id
+    active = await active_documents(session)
+    assert [d.id for d in active] == [newest.document.id]
+
+
+async def test_undo_twice_restores_only_once(session):
+    fees = await save(session, "Членські внески")
+    new = await save(session, "Внески на зиму", replace_id=fees.document.id)
+    await undo_replacement(session, new.document.id)
+    again = await undo_replacement(session, new.document.id)
+    assert again.restored is None
+    assert not again.newer_exists
+
+
+async def test_undo_without_a_replacement_does_nothing(session):
+    new = await save(session, "Внески на зиму")
+    result = await undo_replacement(session, new.document.id)
+    assert result.restored is None
+    assert len(await active_documents(session)) == 1
 
 
 async def test_citation_for_animal_document_has_author_and_kyiv_time(session):

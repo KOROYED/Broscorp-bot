@@ -24,6 +24,7 @@ from bot.config import settings
 from bot.db import Document
 from bot.documents import (
     SOURCE_USER,
+    SaveResult,
     active_documents,
     file_hash,
     find_active_by_hash,
@@ -33,6 +34,7 @@ from bot.documents import (
     normalize_title,
     save_document,
     set_user_name,
+    undo_replacement,
 )
 from bot.llm import LLMError, classify_document, find_previous_version
 from bot.memory import ChatMemory
@@ -67,17 +69,17 @@ LLM_UNAVAILABLE = "Ох, щось я задумався й загубив дум
 class Upload(StatesGroup):
     waiting_name = State()
     waiting_scope = State()
-    waiting_version = State()
+    # Advice was saved as a new version; the sender may still say it's different advice.
+    can_undo = State()
 
 
 class ScopeChoice(CallbackData, prefix="scope"):
     index: int  # position in ALL_SCOPES; callback data is limited to 64 bytes
 
 
-class VersionChoice(CallbackData, prefix="version"):
-    # Only the answer travels in the button; which document to replace stays in FSM
-    # state, so a forged callback can't point at someone else's document.
-    replace: bool
+class UndoReplace(CallbackData, prefix="undo"):
+    """«Ні, це інша порада — поверни стару». Carries no ids: the new document's id is
+    kept in FSM state, so a forged callback can't touch someone else's document."""
 
 
 # Telegram sends /start when an animal opens the bot. No other commands:
@@ -160,7 +162,7 @@ async def on_scope(
         return
     scope = ALL_SCOPES[callback_data.index]
     await callback.message.edit_text(f"Дякую! Запам’ятав: {scope.label}.")
-    await _save_or_confirm(
+    await _save_checking_version(
         callback.message, callback.from_user.id, state, session_factory, upload, scope
     )
 
@@ -170,34 +172,35 @@ async def on_stale_scope(callback: CallbackQuery) -> None:
     await callback.answer("Це питання вже минуло.")
 
 
-@router.callback_query(Upload.waiting_version, VersionChoice.filter())
-async def on_version(
+@router.callback_query(Upload.can_undo, UndoReplace.filter())
+async def on_undo(
     callback: CallbackQuery,
-    callback_data: VersionChoice,
     state: FSMContext,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    data = await state.get_data()
+    new_id = (await state.get_data()).get("new_id")
     await state.clear()
     await callback.answer()
-    upload = data.get("upload")
-    if not upload:
-        await callback.message.edit_text("Цю пораду я вже прибрав на місце.")
+    if new_id is None:
+        await callback.message.edit_reply_markup(reply_markup=None)
         return
-    scope = ALL_SCOPES[data["scope_index"]]
-    if callback_data.replace:
-        await callback.message.edit_text("Добре, заміню стару пораду новою.")
-        replace_id = data["replace_id"]
+    async with session_factory() as session:
+        result = await undo_replacement(session, new_id)
+    if result.restored is not None:
+        await callback.message.edit_text(
+            f"Добре, повернув пораду «{result.restored.title}». "
+            "Тепер обидві поради живуть окремо."
+        )
+    elif result.newer_exists:
+        await callback.message.edit_text(
+            "Стару пораду вже не повернути: відтоді хтось приніс ще новішу."
+        )
     else:
-        await callback.message.edit_text("Добре, збережу її як окрему пораду.")
-        replace_id = None
-    await _save_upload(
-        callback.message, callback.from_user.id, session_factory, upload, scope, replace_id
-    )
+        await callback.message.edit_text("Стару пораду вже не повернути.")
 
 
-@router.callback_query(VersionChoice.filter())
-async def on_stale_version(callback: CallbackQuery) -> None:
+@router.callback_query(UndoReplace.filter())
+async def on_stale_undo(callback: CallbackQuery) -> None:
     await callback.answer("Це питання вже минуло.")
 
 
@@ -260,12 +263,12 @@ async def _process_upload(
             reply_markup=_scope_keyboard(),
         )
         return
-    await _save_or_confirm(
+    await _save_checking_version(
         message, message.from_user.id, state, session_factory, upload, classification.scope
     )
 
 
-async def _save_or_confirm(
+async def _save_checking_version(
     message: Message,
     author_id: int,
     state: FSMContext,
@@ -273,33 +276,42 @@ async def _save_or_confirm(
     upload: dict,
     scope: Scope,
 ) -> None:
-    """The scope is final: save, or first ask whether this is a new version of
-    advice already stored for that scope under another title."""
+    """The scope is final: save. If the advice looks like a new version of one already
+    stored for that scope under another title, replace it right away (client: a newer
+    version always replaces the old one) and let the sender undo it."""
     async with session_factory() as session:
         previous = await _previous_version(session, upload, scope)
-    if previous is None:
-        await _save_upload(message, author_id, session_factory, upload, scope)
+    result = await _store(
+        author_id, session_factory, upload, scope, previous.id if previous else None
+    )
+    saved = f"Зберіг пораду «{result.document.title}» ({scope.label}). Дякую!"
+    old = result.replaced
+    if previous is None or old is None:
+        # Same title (replaced automatically) or nothing to replace: as before.
+        if old is not None:
+            saved += "\nЦе свіжіша порада: стару я прибрав, тепер звірі чутимуть лише нову."
+        await message.answer(saved)
         return
 
-    await state.set_state(Upload.waiting_version)
-    await state.update_data(
-        upload=upload, scope_index=ALL_SCOPES.index(scope), replace_id=previous.id
-    )
-    if previous.author is not None:
-        origin = f", яку надіслав {previous.author.name}, {format_sent_at(previous, settings.tz)}"
+    await state.set_state(Upload.can_undo)
+    await state.update_data(new_id=result.document.id)
+    if old.author is not None:
+        origin = f", яку надіслав {old.author.name}, {format_sent_at(old, settings.tz)}"
     else:
         origin = " з «Лісового архіву»"
-    where = scope.where[0].upper() + scope.where[1:]
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Ні, це інша порада — поверни стару", callback_data=UndoReplace())
     await message.answer(
-        f"{where} уже є порада «{previous.title}»{origin}. Твоя порада — її нова версія?",
-        reply_markup=_version_keyboard(),
+        f"{saved}\nВона замінила пораду «{old.title}»{origin}: "
+        "тепер звірі чутимуть лише нову.",
+        reply_markup=builder.as_markup(),
     )
 
 
 async def _previous_version(session: AsyncSession, upload: dict, scope: Scope) -> Document | None:
-    """Advice in exactly this scope that the upload may replace; the sender confirms."""
+    """Advice in exactly this scope that the upload replaces; the sender can undo it."""
     if await find_active_version(session, scope, normalize_title(upload["title"])) is not None:
-        # Same title: save_document replaces it automatically, as before. No question.
+        # Same title: save_document replaces it automatically, as before. No undo button.
         return None
     existing = await active_documents(session, [scope])
     if not existing:
@@ -309,22 +321,21 @@ async def _previous_version(session: AsyncSession, upload: dict, scope: Scope) -
             upload["title"], upload["text"], [d.title for d in existing]
         )
     except LLMError:
-        # Only a suggestion: if it fails, save as a separate advice instead of losing the upload.
+        # If the check fails, save as separate advice instead of losing the upload.
         logger.exception("Version check failed for %r", upload["title"])
         return None
     return existing[number - 1] if number is not None else None
 
 
-async def _save_upload(
-    message: Message,
+async def _store(
     author_id: int,
     session_factory: async_sessionmaker[AsyncSession],
     upload: dict,
     scope: Scope,
     replace_id: int | None = None,
-) -> None:
+) -> SaveResult:
     async with session_factory() as session:
-        result = await save_document(
+        return await save_document(
             session,
             title=upload["title"],
             scope=scope,
@@ -335,10 +346,6 @@ async def _save_upload(
             sent_at=datetime.fromisoformat(upload["sent_at"]),
             replace_id=replace_id,
         )
-    reply = f"Зберіг пораду «{result.document.title}» ({scope.label}). Дякую!"
-    if result.replaced is not None:
-        reply += "\nЦе свіжіша порада: стару я прибрав, тепер звірі чутимуть лише нову."
-    await message.answer(reply)
 
 
 async def _save_name(
@@ -352,13 +359,6 @@ async def _save_name(
         await set_user_name(session, message.from_user.id, name)
     await message.answer(f"Приємно познайомитись, {name}!")
     return True
-
-
-def _version_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Так, заміни", callback_data=VersionChoice(replace=True))
-    builder.button(text="Ні, це інша порада", callback_data=VersionChoice(replace=False))
-    return builder.as_markup()
 
 
 def _scope_keyboard() -> InlineKeyboardMarkup:

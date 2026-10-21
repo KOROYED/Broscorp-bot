@@ -96,8 +96,9 @@ async def save_document(
 
     "Same document" = same normalized title + same scope (client: newer version
     of the same advice for the same place replaces the old one, anyone may replace).
-    `replace_id`: the sender confirmed this is a new version of that exact document,
-    though its title differs; that row is replaced instead (if it's still active).
+    `replace_id`: the version check matched that exact document, though its title
+    differs; that row is replaced instead. The sender can undo it with
+    `undo_replacement` if it was in fact different advice.
     """
     norm = normalize_title(title)
     if replace_id is not None:
@@ -131,6 +132,31 @@ async def save_document(
     await session.commit()
     await session.refresh(doc, ["author"])
     return SaveResult(document=doc, replaced=old)
+
+
+@dataclass
+class UndoResult:
+    restored: Document | None  # None = nothing restored
+    newer_exists: bool = False  # refused: the new advice has itself been replaced since
+
+
+async def undo_replacement(session: AsyncSession, new_id: int) -> UndoResult:
+    """«Ні, це інша порада»: bring back the document that `new_id` replaced.
+
+    Only if the replacement is still exactly as it was made: the old row is inactive
+    and points at `new_id`, and `new_id` is still active. If someone has replaced the
+    new advice since, restoring the old one would leave two versions of that topic.
+    """
+    new = await session.get(Document, new_id)
+    old = await session.scalar(select(Document).where(Document.replaced_by_id == new_id))
+    if new is None or old is None or old.is_active:
+        return UndoResult(restored=None)
+    if not new.is_active:
+        return UndoResult(restored=None, newer_exists=True)
+    old.is_active = True
+    old.replaced_by_id = None
+    await session.commit()
+    return UndoResult(restored=old)
 
 
 async def find_active_by_hash(session: AsyncSession, content_hash: str) -> Document | None:
