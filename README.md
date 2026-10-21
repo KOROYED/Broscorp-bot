@@ -90,7 +90,8 @@ restarts don't re-run OCR, and an archive document replaced by an animal isn't b
 - **Conversation memory** is in-process (last 3 turns per chat): it only serves follow-up questions.
 - **Replace first, undo on «Ні»**: a likely new version under another title replaces the old one at
   once (the client's rule: a newer version always replaces the old one), and the sender gets one button
-  to undo it. Undo works only while the new version is still the latest; the button carries no ids.
+  to undo it. Undo works only for the sender's latest replacement, and only while the new version is
+  still the latest; older undo buttons expire, and the button carries no ids.
 
 ## Limitations and scaling
 
@@ -113,6 +114,9 @@ Known limitations, and what I'd change next:
   advice deep inside a long document can't be answered: the animal is told «нічого не знаю» about
   something that is stored, and no error shows. Fix: split documents into chunks by section when they
   are saved, search the chunks, and give the model the best one, still citing the whole document.
+- **Missed versions:** a new version under a different title is detected by the LLM. If it misses the
+  match, or the check fails, both versions stay active. Fix: also compare the text with BM25 and flag
+  very similar advice in the same place.
 
 ## Development
 

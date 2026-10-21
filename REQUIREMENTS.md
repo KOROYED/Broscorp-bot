@@ -10,7 +10,7 @@ they still need her confirmation.
   from those documents, **always with the source**.
 - **Confirmed.** Users are all forest animals. Everyone is equal: no admins, no permissions.
 - **Confirmed.** The bot works in private chats only; group chats are not required.
-- **Decision.** Number of concurrent users was left to me. The bot is sized for a forest community of
+- **Confirmed.** Number of concurrent users was left to me. The bot is sized for a forest community of
   tens of animals asking at the same time; the main limit is the Groq free tier. See README →
   "Limitations and scaling" for what would change at a larger scale.
 
@@ -39,11 +39,11 @@ they still need her confirmation.
   forest). **If unclear, the bot asks the sender. It never guesses.**
 - **Confirmed.** Truthfulness of advice is not checked.
 - **Confirmed.** Documents don't expire. A newer version of the same advice for the same place **always**
-  replaces the old one: the replacement never waits for a confirmation. Anyone may replace; the answer
-  cites the new sender and time.
+  replaces the old one: the replacement never waits for a confirmation. Two versions of the same advice
+  must never both stay active. Anyone may replace; the answer cites the new sender and time.
 - **Decision.** "Same document" = same title (ignoring the place name, case and punctuation) + same
   place/area. The bot tells the sender when their upload replaced an older version.
-- **Decision.** If the title differs but the advice looks like a new version of one already stored for
+- **Confirmed.** If the title differs but the advice looks like a new version of one already stored for
   the same place/area, it replaces that one at once, and the bot tells the sender what was replaced:
   «Вона замінила пораду «Членські внески», яку надіслав Їжак, 12.10 о 14:30» with one button
   [Ні, це інша порада — поверни стару]. The old advice comes back only if nobody has replaced the new
@@ -58,7 +58,7 @@ they still need her confirmation.
 
 - **Confirmed.** Standard documents are in the Google Drive folder «Лісовий архів». The bot knows them
   from the start; nobody uploads them via Telegram. Citations show the title (and place) only.
-- **Decision.** The folder (78 files, about 20 of them scans) is snapshotted into the repository and
+- **Confirmed.** The folder (78 files, about 20 of them scans) is snapshotted into the repository and
   imported at startup. The client left syncing with Google Drive to me: no sync, because the archive
   changes rarely and a sync would need Google API credentials and handling of renamed and deleted files.
   When the archive changes, the snapshot is updated; restarts import only changed files.
@@ -88,7 +88,7 @@ they still need her confirmation.
   (see above). The citation line keeps the confirmed format.
 - **Decision.** If the LLM is unavailable: «Ох, щось я задумався й загубив думку… Спитай мене ще раз за хвилинку». The error
   is logged.
-- **Decision.** Times in citations are shown in Kyiv time (Europe/Kyiv). The client left the timezone
+- **Confirmed.** Times in citations are shown in Kyiv time (Europe/Kyiv). The client left the timezone
   to me; it's configurable with the `TIMEZONE` environment variable.
 
 ## Open questions
