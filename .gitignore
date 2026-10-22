@@ -4,7 +4,3 @@ venv/
 .venv/
 .pytest_cache/
 CLAUDE.md
-broscorp_test_task_handoff.md
-TUTOR.md
-INTERVIEW_NOTES.md
-ARCHITECTURE_MAP.md

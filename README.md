@@ -1,5 +1,7 @@
 # Forest advice bot (Мишка-шкряботушка's RAG bot)
 
+**English** · [Українська](README.uk.md)
+
 A Telegram bot for the forest community. Animals send documents with advice; anyone can ask a
 question in plain text and gets an answer **only from those documents, always with the source**:
 
@@ -51,10 +53,10 @@ question ─► scope filter ─► router LLM (by titles) ┐
 1. **Scope filter** (`bot/retrieval.py`, `bot/places.py`). A document belongs to the whole forest,
    one area (coniferous / deciduous / river), or one place. If the question names a place,
    only that place's documents + its areas' + whole-forest documents are candidates. «Під вербою»
-   is in two areas; «На узліссі» in none. Plain code: exact, free, testable.
+   is in two areas; «На узліссі» in none. Plain code: exact, testable.
 2. **Hybrid retrieval.** A small model (`gpt-oss-20b`) picks documents by *meaning* from their titles
    («поїсти» → «Чим поживитись»); BM25 finds *words inside* the text («тиша» is a section of
-   «Правила співжиття»). Groq has no embeddings model, and the corpus is small, so no vector DB.
+   «Правила співжиття»). Groq has no embeddings model, and the set of documents is small, so no vector DB.
 3. **Pick, then answer** (`gpt-oss-120b`). One answer comes from **one document**, never a mix:
    - *Pick*: the model sees the candidates and returns only `{status, source, question}`: the number
      of the one most relevant document (place-specific outranks general, the client's rule) and the
