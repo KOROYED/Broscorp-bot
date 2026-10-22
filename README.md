@@ -2,7 +2,9 @@
 
 **English** · [Українська](README.uk.md)
 
-A Telegram bot for the forest community. Animals send documents with advice; anyone can ask a
+A Telegram bot for the forest community. Link: [@lisovyi_poradnyk_bot](https://t.me/lisovyi_poradnyk_bot)
+
+Animals send documents with advice; anyone can ask a
 question in plain text and gets an answer **only from those documents, always with the source**:
 
 > **Q:** Скільки внесок під дубом і до якого числа?
